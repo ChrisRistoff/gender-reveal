@@ -1,0 +1,121 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Gender Reveal App
+
+Globals:
+  Function:
+    Timeout: 10
+    Runtime: nodejs23.x
+    Architectures:
+      - x86_64
+    Environment:
+      Variables:
+        TABLE_NAME: !Ref GuessesTable
+    LoggingConfig:
+      LogFormat: JSON
+
+Resources:
+
+  # ── DynamoDB ──────────────────────────────────────────────
+  GuessesTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: gender-reveal-guesses
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: guessId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: guessId
+          KeyType: HASH
+      StreamSpecification:
+        StreamViewType: NEW_AND_OLD_IMAGES
+
+  # ── Lambda: Submit a guess ────────────────────────────────
+  SubmitGuessFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/submitGuess/
+      Handler: app.handler
+      Policies:
+        - DynamoDBWritePolicy:
+            TableName: !Ref GuessesTable
+      Events:
+        SubmitGuess:
+          Type: Api
+          Properties:
+            Path: /guess
+            Method: post
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Format: esm
+        OutExtension:
+          - .js=.mjs
+        Target: es2020
+        Minify: false
+        Sourcemap: true
+        EntryPoints:
+          - app.ts
+
+  # ── Lambda: Poll guess status ─────────────────────────────
+  GetGuessFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/getGuess/
+      Handler: app.handler
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref GuessesTable
+      Events:
+        GetGuess:
+          Type: Api
+          Properties:
+            Path: /guess/{guessId}
+            Method: get
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Format: esm
+        OutExtension:
+          - .js=.mjs
+        Target: es2020
+        Minify: false
+        Sourcemap: true
+        EntryPoints:
+          - app.ts
+
+  # ── Lambda: Processor (triggered by DynamoDB Stream) ──────
+  ProcessGuessFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/processGuess/
+      Handler: app.handler
+      Policies:
+        - DynamoDBWritePolicy:
+            TableName: !Ref GuessesTable
+      Events:
+        Stream:
+          Type: DynamoDB
+          Properties:
+            Stream: !GetAtt GuessesTable.StreamArn
+            StartingPosition: TRIM_HORIZON
+            FilterCriteria:
+              Filters:
+                - Pattern: '{"dynamodb":{"NewImage":{"status":{"S":["PENDING"]}}}}'
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Format: esm
+        OutExtension:
+          - .js=.mjs
+        Target: es2020
+        Minify: false
+        Sourcemap: true
+        EntryPoints:
+          - app.ts
+
+Outputs:
+  ApiEndpoint:
+    Description: API Gateway endpoint
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}/Prod"
