@@ -1,35 +1,270 @@
-AWSTemplateFormatVersion: '2010-09-09'
+AWSTemplateFormatVersion: "2010-09-09"
 Transform: AWS::Serverless-2016-10-31
 Description: Gender Reveal App
 
 Globals:
   Function:
     Timeout: 10
-    Runtime: nodejs23.x
+    Runtime: nodejs22.x
     Architectures:
       - x86_64
     Environment:
       Variables:
-        TABLE_NAME: !Ref GuessesTable
+        SCANS_TABLE: !Ref ScansTable
+        GUESSES_TABLE: !Ref GuessesTable
+        SCANS_BUCKET: !Ref ScansBucket
+        SCORE_GUESS_QUEUE_URL: !Ref ScoreGuessQueue
+        GUESS_RESULT_TOPIC_ARN: !Ref GuessResultTopic
     LoggingConfig:
       LogFormat: JSON
+  Api:
+    Auth:
+      DefaultAuthorizer: CognitoAuthorizer
+      Authorizers:
+        CognitoAuthorizer:
+          UserPoolArn: !GetAtt UserPool.Arn
 
 Resources:
+  # ── DynamoDB: Scans ───────────────────────────────────────
+  ScansTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: scan-guess-scans
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: userId
+          AttributeType: S
+        - AttributeName: scanId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: userId
+          KeyType: HASH
+        - AttributeName: scanId
+          KeyType: RANGE
+      StreamSpecification:
+        StreamViewType: NEW_AND_OLD_IMAGES
+      GlobalSecondaryIndexes:
+          - IndexName: scanId-index
+            KeySchema:
+              - AttributeName: scanId
+                KeyType: HASH
+            Projection:
+              ProjectionType: ALL
 
-  # ── DynamoDB ──────────────────────────────────────────────
+# ── SQS: Score guess queue (feeds into scorer lambda) ─────
+  ScoreGuessQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: score-guess-queue
+      VisibilityTimeout: 30
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt ScoreGuessDLQ.Arn
+        maxReceiveCount: 3
+
+  ScoreGuessDLQ:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: score-guess-dlq
+
+  # ── SQS: Notify queue (feeds into notify lambda) ──────────
+  NotifyUserQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: notify-user-queue
+      VisibilityTimeout: 30
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt NotifyUserDLQ.Arn
+        maxReceiveCount: 3
+
+  NotifyUserDLQ:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: notify-user-dlq
+
+  # ── SQS: Leaderboard queue (feeds into leaderboard lambda) ─
+  LeaderboardQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: leaderboard-queue
+      VisibilityTimeout: 30
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt LeaderboardDLQ.Arn
+        maxReceiveCount: 3
+
+  LeaderboardDLQ:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: leaderboard-dlq
+
+  # ── SNS Topic ──────────────────────────────────────────────
+  GuessResultTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: guess-result-topic
+
+  # ── SNS → SQS Subscriptions ────────────────────────────────
+  NotifyUserSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      TopicArn: !Ref GuessResultTopic
+      Protocol: sqs
+      Endpoint: !GetAtt NotifyUserQueue.Arn
+
+  LeaderboardSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      TopicArn: !Ref GuessResultTopic
+      Protocol: sqs
+      Endpoint: !GetAtt LeaderboardQueue.Arn
+
+  # ── SQS Queue Policies (allow SNS to write to the queues) ──
+  NotifyUserQueuePolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      Queues:
+        - !Ref NotifyUserQueue
+      PolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: sns.amazonaws.com
+            Action: sqs:SendMessage
+            Resource: !GetAtt NotifyUserQueue.Arn
+            Condition:
+              ArnEquals:
+                aws:SourceArn: !Ref GuessResultTopic
+
+  LeaderboardQueuePolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      Queues:
+        - !Ref LeaderboardQueue
+      PolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: sns.amazonaws.com
+            Action: sqs:SendMessage
+            Resource: !GetAtt LeaderboardQueue.Arn
+            Condition:
+              ArnEquals:
+                aws:SourceArn: !Ref GuessResultTopic
+
+  # ── DynamoDB: Guesses ─────────────────────────────────────
   GuessesTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: gender-reveal-guesses
+      TableName: scan-guess-guesses
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
-        - AttributeName: guessId
+        - AttributeName: scanId
+          AttributeType: S
+        - AttributeName: userId
           AttributeType: S
       KeySchema:
-        - AttributeName: guessId
+        - AttributeName: scanId
           KeyType: HASH
+        - AttributeName: userId
+          KeyType: RANGE
       StreamSpecification:
         StreamViewType: NEW_AND_OLD_IMAGES
+
+  # ── S3 Bucket ─────────────────────────────────────────────
+  ScansBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "scan-guess-scans-${AWS::AccountId}"
+      CorsConfiguration:
+        CorsRules:
+          - AllowedHeaders:
+              - "*"
+            AllowedMethods:
+              - GET
+              - PUT
+            AllowedOrigins:
+              - "*"
+
+  # ── Cognito User Pool ─────────────────────────────────────
+  UserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: scan-guess-user-pool
+      AutoVerifiedAttributes:
+        - email
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 8
+          RequireUppercase: true
+          RequireLowercase: true
+          RequireNumbers: true
+          RequireSymbols: false
+
+  # ── Cognito User Pool Client ──────────────────────────────
+  UserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      ClientName: scan-guess-client
+      UserPoolId: !Ref UserPool
+      ExplicitAuthFlows:
+        - ALLOW_USER_PASSWORD_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
+      GenerateSecret: false
+
+# ── Lambda: Upload a scan ─────────────────────────────────
+  UploadScanFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/uploadScan/
+      Handler: app.handler
+      Policies:
+        - DynamoDBWritePolicy:
+            TableName: !Ref ScansTable
+        - S3WritePolicy:
+            BucketName: !Ref ScansBucket
+      Events:
+        UploadScan:
+          Type: Api
+          Properties:
+            Path: /scans
+            Method: post
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Format: cjs
+        OutExtension:
+          - .js=.js
+        Target: es2020
+        Minify: false
+        Sourcemap: true
+        EntryPoints:
+          - app.ts
+
+  # ── Lambda: Get all scans ─────────────────────────────────
+  GetScansFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/getScans/
+      Handler: app.handler
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref ScansTable
+      Events:
+        GetScans:
+          Type: Api
+          Properties:
+            Path: /scans
+            Method: get
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Format: cjs
+        OutExtension:
+          - .js=.js
+        Target: es2020
+        Minify: false
+        Sourcemap: true
+        EntryPoints:
+          - app.ts
 
   # ── Lambda: Submit a guess ────────────────────────────────
   SubmitGuessFunction:
@@ -40,25 +275,27 @@ Resources:
       Policies:
         - DynamoDBWritePolicy:
             TableName: !Ref GuessesTable
+        - DynamoDBReadPolicy:
+            TableName: !Ref ScansTable
       Events:
         SubmitGuess:
           Type: Api
           Properties:
-            Path: /guess
+            Path: /scans/{scanId}/guess
             Method: post
     Metadata:
       BuildMethod: esbuild
       BuildProperties:
-        Format: esm
+        Format: cjs
         OutExtension:
-          - .js=.mjs
+          - .js=.js
         Target: es2020
         Minify: false
         Sourcemap: true
         EntryPoints:
           - app.ts
 
-  # ── Lambda: Poll guess status ─────────────────────────────
+  # ── Lambda: Get guess status ──────────────────────────────
   GetGuessFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -71,44 +308,102 @@ Resources:
         GetGuess:
           Type: Api
           Properties:
-            Path: /guess/{guessId}
+            Path: /scans/{scanId}/guess
             Method: get
     Metadata:
       BuildMethod: esbuild
       BuildProperties:
-        Format: esm
+        Format: cjs
         OutExtension:
-          - .js=.mjs
+          - .js=.js
         Target: es2020
         Minify: false
         Sourcemap: true
         EntryPoints:
           - app.ts
 
-  # ── Lambda: Processor (triggered by DynamoDB Stream) ──────
-  ProcessGuessFunction:
+  # ── Lambda: Reveal gender ─────────────────────────────────
+  RevealGenderFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: src/processGuess/
+      CodeUri: src/revealGender/
       Handler: app.handler
       Policies:
         - DynamoDBWritePolicy:
+            TableName: !Ref ScansTable
+      Events:
+        RevealGender:
+          Type: Api
+          Properties:
+            Path: /scans/{scanId}/reveal
+            Method: post
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Format: cjs
+        OutExtension:
+          - .js=.js
+        Target: es2020
+        Minify: false
+        Sourcemap: true
+        EntryPoints:
+          - app.ts
+
+# ── Lambda: Reveal processor (dynamo stream → sqs) ────────
+  RevealProcessorFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/revealProcessor/
+      Handler: app.handler
+      Policies:
+        - DynamoDBReadPolicy:
             TableName: !Ref GuessesTable
+        - SQSSendMessagePolicy:
+            QueueName: !GetAtt ScoreGuessQueue.QueueName
       Events:
         Stream:
           Type: DynamoDB
           Properties:
-            Stream: !GetAtt GuessesTable.StreamArn
+            Stream: !GetAtt ScansTable.StreamArn
             StartingPosition: TRIM_HORIZON
             FilterCriteria:
               Filters:
-                - Pattern: '{"dynamodb":{"NewImage":{"status":{"S":["PENDING"]}}}}'
+                - Pattern: '{"dynamodb":{"NewImage":{"status":{"S":["REVEALED"]}}}}'
     Metadata:
       BuildMethod: esbuild
       BuildProperties:
-        Format: esm
+        Format: cjs
         OutExtension:
-          - .js=.mjs
+          - .js=.js
+        Target: es2020
+        Minify: false
+        Sourcemap: true
+        EntryPoints:
+          - app.ts
+
+# ── Lambda: Score guess (sqs → dynamo → sns) ──────────────
+  ScoreGuessFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/scoreGuess/
+      Handler: app.handler
+      Policies:
+        - DynamoDBWritePolicy:
+            TableName: !Ref GuessesTable
+        - SNSPublishMessagePolicy:
+            TopicName: !GetAtt GuessResultTopic.TopicName
+      Events:
+        SQSEvent:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt ScoreGuessQueue.Arn
+            BatchSize: 10
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Format: cjs
+        OutExtension:
+          - .js=.js
         Target: es2020
         Minify: false
         Sourcemap: true
@@ -119,3 +414,9 @@ Outputs:
   ApiEndpoint:
     Description: API Gateway endpoint
     Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}/Prod"
+  UserPoolId:
+    Description: Cognito User Pool ID
+    Value: !Ref UserPool
+  UserPoolClientId:
+    Description: Cognito User Pool Client ID
+    Value: !Ref UserPoolClient
