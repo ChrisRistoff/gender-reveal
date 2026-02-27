@@ -1,0 +1,158 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: Scan related lambda functions
+
+Parameters:
+  ScansTableName:
+    Type: String
+  ScansTableArn:
+    Type: String
+  ScansTableStreamArn:
+    Type: String
+  GuessesTableName:
+    Type: String
+  GuessesTableArn:
+    Type: String
+  ScansBucketName:
+    Type: String
+  ScoreGuessQueueUrl:
+    Type: String
+  ScoreGuessQueueName:
+    Type: String
+  UserPoolArn:
+    Type: String
+
+Globals:
+  Function:
+    Timeout: 10
+    Runtime: nodejs22.x
+    Architectures:
+      - x86_64
+    Environment:
+      Variables:
+        SCANS_TABLE: !Ref ScansTableName
+        GUESSES_TABLE: !Ref GuessesTableName
+        SCANS_BUCKET: !Ref ScansBucketName
+        SCORE_GUESS_QUEUE_URL: !Ref ScoreGuessQueueUrl
+    LoggingConfig:
+      LogFormat: JSON
+  Api:
+    Auth:
+      DefaultAuthorizer: CognitoAuthorizer
+      Authorizers:
+        CognitoAuthorizer:
+          UserPoolArn: !Ref UserPoolArn
+
+Resources:
+  UploadScanFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../src/uploadScan/
+      Handler: app.handler
+      Policies:
+        - DynamoDBWritePolicy:
+            TableName: !Ref ScansTableName
+        - S3WritePolicy:
+            BucketName: !Ref ScansBucketName
+      Events:
+        UploadScan:
+          Type: Api
+          Properties:
+            Path: /scans
+            Method: post
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Format: cjs
+        OutExtension:
+          - .js=.js
+        Target: es2020
+        Minify: false
+        Sourcemap: true
+        EntryPoints:
+          - app.ts
+
+  GetScansFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../src/getScans/
+      Handler: app.handler
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref ScansTableName
+        - S3ReadPolicy:
+            BucketName: !Ref ScansBucketName
+      Events:
+        GetScans:
+          Type: Api
+          Properties:
+            Path: /scans
+            Method: get
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Format: cjs
+        OutExtension:
+          - .js=.js
+        Target: es2020
+        Minify: false
+        Sourcemap: true
+        EntryPoints:
+          - app.ts
+
+  RevealGenderFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../src/revealGender/
+      Handler: app.handler
+      Policies:
+        - DynamoDBWritePolicy:
+            TableName: !Ref ScansTableName
+      Events:
+        RevealGender:
+          Type: Api
+          Properties:
+            Path: /scans/{scanId}/reveal
+            Method: post
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Format: cjs
+        OutExtension:
+          - .js=.js
+        Target: es2020
+        Minify: false
+        Sourcemap: true
+        EntryPoints:
+          - app.ts
+
+  RevealProcessorFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../src/revealProcessor/
+      Handler: app.handler
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref GuessesTableName
+        - SQSSendMessagePolicy:
+            QueueName: !Ref ScoreGuessQueueName
+      Events:
+        Stream:
+          Type: DynamoDB
+          Properties:
+            Stream: !Ref ScansTableStreamArn
+            StartingPosition: TRIM_HORIZON
+            FilterCriteria:
+              Filters:
+                - Pattern: '{"dynamodb":{"NewImage":{"status":{"S":["REVEALED"]}}}}'
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Format: cjs
+        OutExtension:
+          - .js=.js
+        Target: es2020
+        Minify: false
+        Sourcemap: true
+        EntryPoints:
+          - app.ts

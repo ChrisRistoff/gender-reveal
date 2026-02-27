@@ -1,0 +1,75 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: DynamoDB tables and S3 bucket
+
+Resources:
+  ScansTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: scan-guess-scans
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: userId
+          AttributeType: S
+        - AttributeName: scanId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: userId
+          KeyType: HASH
+        - AttributeName: scanId
+          KeyType: RANGE
+      StreamSpecification:
+        StreamViewType: NEW_AND_OLD_IMAGES
+      GlobalSecondaryIndexes:
+        - IndexName: scanId-index
+          KeySchema:
+            - AttributeName: scanId
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+
+  GuessesTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: scan-guess-guesses
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: scanId
+          AttributeType: S
+        - AttributeName: userId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: scanId
+          KeyType: HASH
+        - AttributeName: userId
+          KeyType: RANGE
+      StreamSpecification:
+        StreamViewType: NEW_AND_OLD_IMAGES
+
+  ScansBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Delete
+    Properties:
+      BucketName: !Sub "scan-guess-scans-${AWS::AccountId}"
+      CorsConfiguration:
+        CorsRules:
+          - AllowedHeaders:
+              - "*"
+            AllowedMethods:
+              - GET
+              - PUT
+            AllowedOrigins:
+              - "*"
+
+Outputs:
+  ScansTableName:
+    Value: !Ref ScansTable
+  ScansTableArn:
+    Value: !GetAtt ScansTable.Arn
+  ScansTableStreamArn:
+    Value: !GetAtt ScansTable.StreamArn
+  GuessesTableName:
+    Value: !Ref GuessesTable
+  GuessesTableArn:
+    Value: !GetAtt GuessesTable.Arn
+  ScansBucketName:
+    Value: !Ref ScansBucket

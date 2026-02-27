@@ -1,0 +1,112 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: SQS queues, SNS topic, subscriptions and policies
+
+Resources:
+  ScoreGuessQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: score-guess-queue
+      VisibilityTimeout: 30
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt ScoreGuessDLQ.Arn
+        maxReceiveCount: 3
+
+  ScoreGuessDLQ:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: score-guess-dlq
+
+  NotifyUserQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: notify-user-queue
+      VisibilityTimeout: 30
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt NotifyUserDLQ.Arn
+        maxReceiveCount: 3
+
+  NotifyUserDLQ:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: notify-user-dlq
+
+  LeaderboardQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: leaderboard-queue
+      VisibilityTimeout: 30
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt LeaderboardDLQ.Arn
+        maxReceiveCount: 3
+
+  LeaderboardDLQ:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: leaderboard-dlq
+
+  GuessResultTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: guess-result-topic
+
+  NotifyUserSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      TopicArn: !Ref GuessResultTopic
+      Protocol: sqs
+      Endpoint: !GetAtt NotifyUserQueue.Arn
+
+  LeaderboardSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      TopicArn: !Ref GuessResultTopic
+      Protocol: sqs
+      Endpoint: !GetAtt LeaderboardQueue.Arn
+
+  NotifyUserQueuePolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      Queues:
+        - !Ref NotifyUserQueue
+      PolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: sns.amazonaws.com
+            Action: sqs:SendMessage
+            Resource: !GetAtt NotifyUserQueue.Arn
+            Condition:
+              ArnEquals:
+                aws:SourceArn: !Ref GuessResultTopic
+
+  LeaderboardQueuePolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      Queues:
+        - !Ref LeaderboardQueue
+      PolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: sns.amazonaws.com
+            Action: sqs:SendMessage
+            Resource: !GetAtt LeaderboardQueue.Arn
+            Condition:
+              ArnEquals:
+                aws:SourceArn: !Ref GuessResultTopic
+
+Outputs:
+  ScoreGuessQueueUrl:
+    Value: !Ref ScoreGuessQueue
+  ScoreGuessQueueArn:
+    Value: !GetAtt ScoreGuessQueue.Arn
+  ScoreGuessQueueName:
+    Value: !GetAtt ScoreGuessQueue.QueueName
+  NotifyUserQueueArn:
+    Value: !GetAtt NotifyUserQueue.Arn
+  LeaderboardQueueArn:
+    Value: !GetAtt LeaderboardQueue.Arn
+  GuessResultTopicArn:
+    Value: !Ref GuessResultTopic
+  GuessResultTopicName:
+    Value: !GetAtt GuessResultTopic.TopicName
