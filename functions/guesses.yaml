@@ -26,6 +26,7 @@ Parameters:
 
 Globals:
   Function:
+    CodeUri: ../
     Timeout: 10
     Runtime: nodejs22.x
     Architectures:
@@ -48,19 +49,20 @@ Resources:
   SubmitGuessFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: ../src/submitGuess/
-      Handler: app.handler
+      Handler: submitGuessHandler.handler
       Policies:
         - DynamoDBWritePolicy:
             TableName: !Ref GuessesTableName
         - DynamoDBReadPolicy:
             TableName: !Ref ScansTableName
+
       Events:
         SubmitGuess:
           Type: Api
           Properties:
             Path: /scans/{scanId}/guess
             Method: post
+
     Metadata:
       BuildMethod: esbuild
       BuildProperties:
@@ -71,22 +73,23 @@ Resources:
         Minify: false
         Sourcemap: true
         EntryPoints:
-          - app.ts
+          - src/submitGuess/submitGuessHandler.ts
 
   GetGuessFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: ../src/getGuess/
-      Handler: app.handler
+      Handler: getGuessHandler.handler
       Policies:
         - DynamoDBReadPolicy:
             TableName: !Ref GuessesTableName
+
       Events:
         GetGuess:
           Type: Api
           Properties:
             Path: /scans/{scanId}/guess
             Method: get
+
     Metadata:
       BuildMethod: esbuild
       BuildProperties:
@@ -97,24 +100,25 @@ Resources:
         Minify: false
         Sourcemap: true
         EntryPoints:
-          - app.ts
+          - src/getGuess/getGuessHandler.ts
 
   ScoreGuessFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: ../src/scoreGuess/
-      Handler: app.handler
+      Handler: scoreGuessHandler.handler
       Policies:
         - DynamoDBWritePolicy:
             TableName: !Ref GuessesTableName
         - SNSPublishMessagePolicy:
             TopicName: !Ref GuessResultTopicName
+
       Events:
         SQSEvent:
           Type: SQS
           Properties:
             Queue: !Ref ScoreGuessQueueArn
             BatchSize: 10
+
     Metadata:
       BuildMethod: esbuild
       BuildProperties:
@@ -125,19 +129,19 @@ Resources:
         Minify: false
         Sourcemap: true
         EntryPoints:
-          - app.ts
+          - src/scoreGuess/scoreGuessHandler.ts
 
   NotifyUserFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: ../src/notifyUser/
-      Handler: app.handler
+      Handler: notifyUser.handler
       Events:
         SQSEvent:
           Type: SQS
           Properties:
             Queue: !Ref NotifyUserQueueArn
             BatchSize: 10
+
     Metadata:
       BuildMethod: esbuild
       BuildProperties:
@@ -148,4 +152,29 @@ Resources:
         Minify: false
         Sourcemap: true
         EntryPoints:
-          - app.ts
+          - src/notifyUser/notifyUser.ts
+
+  LeaderboardFunction:
+      Type: AWS::Serverless::Function
+      Properties:
+        Handler: leaderboard.handler
+        Policies:
+          - SSMParameterReadPolicy:
+              ParameterName: scan-guess/db-url
+        Events:
+          SQSEvent:
+            Type: SQS
+            Properties:
+              Queue: !Ref LeaderboardQueueArn
+              BatchSize: 10
+      Metadata:
+        BuildMethod: esbuild
+        BuildProperties:
+          Format: cjs
+          OutExtension:
+            - .js=.js
+          Target: es2020
+          Minify: false
+          Sourcemap: true
+          EntryPoints:
+            - src/leaderboard/leaderboard.ts

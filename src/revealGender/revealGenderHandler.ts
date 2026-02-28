@@ -1,11 +1,9 @@
-import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
-import { DynamoDBDocumentClient, GetCommand } from "@aws-sdk/lib-dynamodb";
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
-
-const dynamo = DynamoDBDocumentClient.from(new DynamoDBClient());
+import { RevealStatus } from "@shared/enums";
+import { updateScanGender } from "./revealGenderService";
 
 export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
-    // get user id from cognito token
+    // get user from cognito
     const userId = event.requestContext.authorizer?.claims?.sub;
 
     if (!userId) {
@@ -15,7 +13,7 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
         };
     }
 
-    // get scanId from url
+    // get scan id from url
     const scanId = event.pathParameters?.scanId;
 
     if (!scanId) {
@@ -25,21 +23,20 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
         };
     }
 
-    // look up this user's guess for this specific scan
-    const result = await dynamo.send(new GetCommand({
-        TableName: process.env.GUESSES_TABLE!,
-        Key: { scanId, userId },
-    }));
+    const body = JSON.parse(event.body ?? "{}");
+    const { gender } = body;
 
-    if (!result.Item) {
+    const result = await updateScanGender(scanId, userId, gender);
+
+    if (!result.success) {
         return {
-            statusCode: 404,
-            body: JSON.stringify({ message: "no guess found for this scan" }),
-        };
+            statusCode: result.code,
+            body: result.body
+        }
     }
 
     return {
         statusCode: 200,
-        body: JSON.stringify(result.Item),
+        body: JSON.stringify({ scanId, status: RevealStatus.Revealed, gender: gender.toLowerCase() }),
     };
 };

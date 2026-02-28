@@ -6,7 +6,10 @@
         "strict": true,
         "esModuleInterop": true,
         "outDir": "./dist",
-        "rootDir": "./src"
+        "rootDir": "./src",
+        "paths": {
+            "@shared/*": ["./src/*"]
+        }
     },
     "include": [
         "src/**/*"

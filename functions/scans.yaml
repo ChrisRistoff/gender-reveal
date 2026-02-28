@@ -24,6 +24,7 @@ Parameters:
 
 Globals:
   Function:
+    CodeUri: ../
     Timeout: 10
     Runtime: nodejs22.x
     Architectures:
@@ -47,19 +48,20 @@ Resources:
   UploadScanFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: ../src/uploadScan/
-      Handler: app.handler
+      Handler: uploadScanHandler.handler
       Policies:
         - DynamoDBWritePolicy:
             TableName: !Ref ScansTableName
         - S3WritePolicy:
             BucketName: !Ref ScansBucketName
+
       Events:
         UploadScan:
           Type: Api
           Properties:
             Path: /scans
             Method: post
+
     Metadata:
       BuildMethod: esbuild
       BuildProperties:
@@ -70,24 +72,25 @@ Resources:
         Minify: false
         Sourcemap: true
         EntryPoints:
-          - app.ts
+          - src/uploadScan/uploadScanHandler.ts
 
   GetScansFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: ../src/getScans/
-      Handler: app.handler
+      Handler: getScansHandler.handler
       Policies:
         - DynamoDBReadPolicy:
             TableName: !Ref ScansTableName
         - S3ReadPolicy:
             BucketName: !Ref ScansBucketName
+
       Events:
         GetScans:
           Type: Api
           Properties:
             Path: /scans
             Method: get
+
     Metadata:
       BuildMethod: esbuild
       BuildProperties:
@@ -98,22 +101,23 @@ Resources:
         Minify: false
         Sourcemap: true
         EntryPoints:
-          - app.ts
+          - src/getScans/getScansHandler.ts
 
   RevealGenderFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: ../src/revealGender/
-      Handler: app.handler
+      Handler: revealGenderHandler.handler
       Policies:
         - DynamoDBWritePolicy:
             TableName: !Ref ScansTableName
+
       Events:
         RevealGender:
           Type: Api
           Properties:
             Path: /scans/{scanId}/reveal
             Method: post
+
     Metadata:
       BuildMethod: esbuild
       BuildProperties:
@@ -124,18 +128,18 @@ Resources:
         Minify: false
         Sourcemap: true
         EntryPoints:
-          - app.ts
+          - src/revealGender/revealGenderHandler.ts
 
   RevealProcessorFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: ../src/revealProcessor/
-      Handler: app.handler
+      Handler: revealProcessorHandler.handler
       Policies:
         - DynamoDBReadPolicy:
             TableName: !Ref GuessesTableName
         - SQSSendMessagePolicy:
             QueueName: !Ref ScoreGuessQueueName
+
       Events:
         Stream:
           Type: DynamoDB
@@ -145,6 +149,7 @@ Resources:
             FilterCriteria:
               Filters:
                 - Pattern: '{"dynamodb":{"NewImage":{"status":{"S":["REVEALED"]}}}}'
+
     Metadata:
       BuildMethod: esbuild
       BuildProperties:
@@ -155,4 +160,4 @@ Resources:
         Minify: false
         Sourcemap: true
         EntryPoints:
-          - app.ts
+          - src/revealProcessor/revealProcessorHandler.ts
