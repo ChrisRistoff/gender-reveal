@@ -26,6 +26,7 @@ Parameters:
 
 Globals:
   Function:
+    CodeUri: ../
     Timeout: 10
     Runtime: nodejs22.x
     Architectures:
@@ -48,7 +49,6 @@ Resources:
   SubmitGuessFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: ../src/submitGuess/
       Handler: submitGuessHandler.handler
       Policies:
         - DynamoDBWritePolicy:
@@ -73,12 +73,11 @@ Resources:
         Minify: false
         Sourcemap: true
         EntryPoints:
-          - submitGuessHandler.ts
+          - src/submitGuess/submitGuessHandler.ts
 
   GetGuessFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: ../src/getGuess/
       Handler: getGuessHandler.handler
       Policies:
         - DynamoDBReadPolicy:
@@ -101,12 +100,11 @@ Resources:
         Minify: false
         Sourcemap: true
         EntryPoints:
-          - getGuessHandler.ts
+          - src/getGuess/getGuessHandler.ts
 
   ScoreGuessFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: ../src/scoreGuess/
       Handler: scoreGuessHandler.handler
       Policies:
         - DynamoDBWritePolicy:
@@ -131,12 +129,11 @@ Resources:
         Minify: false
         Sourcemap: true
         EntryPoints:
-          - scoreGuessHandler.ts
+          - src/scoreGuess/scoreGuessHandler.ts
 
   NotifyUserFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: ../src/notifyUser/
       Handler: notifyUser.handler
       Events:
         SQSEvent:
@@ -155,12 +152,11 @@ Resources:
         Minify: false
         Sourcemap: true
         EntryPoints:
-          - notifyUser.ts
+          - src/notifyUser/notifyUser.ts
 
   LeaderboardFunction:
       Type: AWS::Serverless::Function
       Properties:
-        CodeUri: ../src/leaderboard/
         Handler: leaderboard.handler
         Policies:
           - SSMParameterReadPolicy:
@@ -181,4 +177,4 @@ Resources:
           Minify: false
           Sourcemap: true
           EntryPoints:
-            - leaderboard.ts
+            - src/leaderboard/leaderboard.ts

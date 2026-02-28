@@ -1,5 +1,4 @@
-import { ResultError } from "../commonTypes";
-import { Genders, RevealStatus } from "../enums";
+import { Genders, RevealStatus } from "@shared/enums";
 import { getScanById, createGuess } from "./submitGuessRepository";
 import { SubmitGuessInput, SubmitGuessResult } from "./types";
 

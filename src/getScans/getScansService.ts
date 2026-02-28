@@ -1,5 +1,5 @@
 import { Scan } from "../commonTypes";
-import { RevealStatus } from "../enums";
+import { RevealStatus } from "@shared/enums";
 import { getAllScans, getImageUrl } from "./getScansRepository";
 
 export const getAllScansWithUrls = async (): Promise<Scan[]> => {

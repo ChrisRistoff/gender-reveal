@@ -1,7 +1,7 @@
 import { DynamoDBDocumentClient, UpdateCommand, QueryCommand } from "@aws-sdk/lib-dynamodb";
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
-import { Genders, RevealStatus } from "../enums";
-import { Scan } from "../commonTypes";
+import { Genders, RevealStatus } from "@shared/enums";
+import { Scan } from "@shared/commonTypes";
 
 
 const dynamo = DynamoDBDocumentClient.from(new DynamoDBClient());

@@ -24,6 +24,7 @@ Parameters:
 
 Globals:
   Function:
+    CodeUri: ../
     Timeout: 10
     Runtime: nodejs22.x
     Architectures:
@@ -47,7 +48,6 @@ Resources:
   UploadScanFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: ../src/uploadScan/
       Handler: uploadScanHandler.handler
       Policies:
         - DynamoDBWritePolicy:
@@ -72,13 +72,12 @@ Resources:
         Minify: false
         Sourcemap: true
         EntryPoints:
-          - uploadScanHandler.ts
+          - src/uploadScan/uploadScanHandler.ts
 
   GetScansFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: ../src/getScans/
-      Handler: getScans.handler
+      Handler: getScansHandler.handler
       Policies:
         - DynamoDBReadPolicy:
             TableName: !Ref ScansTableName
@@ -102,13 +101,12 @@ Resources:
         Minify: false
         Sourcemap: true
         EntryPoints:
-          - getScans.ts
+          - src/getScans/getScansHandler.ts
 
   RevealGenderFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: ../src/revealGender/
-      Handler: revealGender.handler
+      Handler: revealGenderHandler.handler
       Policies:
         - DynamoDBWritePolicy:
             TableName: !Ref ScansTableName
@@ -130,12 +128,11 @@ Resources:
         Minify: false
         Sourcemap: true
         EntryPoints:
-          - revealGender.ts
+          - src/revealGender/revealGenderHandler.ts
 
   RevealProcessorFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: ../src/revealProcessor/
       Handler: revealProcessorHandler.handler
       Policies:
         - DynamoDBReadPolicy:
@@ -163,4 +160,4 @@ Resources:
         Minify: false
         Sourcemap: true
         EntryPoints:
-          - revealProcessorHandler.ts
+          - src/revealProcessor/revealProcessorHandler.ts

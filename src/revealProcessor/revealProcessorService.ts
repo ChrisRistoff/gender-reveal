@@ -1,6 +1,6 @@
 import { DynamoDBStreamEvent } from "aws-lambda";
 import { getGuessesById, publishGuessesForScoring } from "./revealProcessorRepository";
-import { RevealStatus } from "../enums";
+import { RevealStatus } from "@shared/enums";
 
 export const processGuesses = async (event: DynamoDBStreamEvent): Promise<void> => {
     for (const record of event.Records) {

@@ -1,4 +1,4 @@
-import { GuessStatus } from "../enums";
+import { GuessStatus } from "@shared/enums";
 import { updateGuessStatus, publishGuessResult } from "./scoreGuessRepository";
 import { ScoreGuessInput } from "./types";
 

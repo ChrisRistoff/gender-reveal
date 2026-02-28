@@ -1,4 +1,4 @@
-import { ResultError } from "../commonTypes";
+import { ResultError } from "@shared/commonTypes";
 
 export type EnsureNoScanResult = ResultError | { success: true };
 
