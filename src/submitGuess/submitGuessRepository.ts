@@ -1,6 +1,6 @@
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { DynamoDBDocumentClient, PutCommand, QueryCommand } from "@aws-sdk/lib-dynamodb";
-import { GuessStatus } from "@shared/enums";
+import { GuessStatus } from "../enums";
 
 const dynamo = DynamoDBDocumentClient.from(new DynamoDBClient());
 

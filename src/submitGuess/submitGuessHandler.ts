@@ -1,6 +1,6 @@
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
 import { submitGuess } from "./submitGuessService";
-import { GuessStatus } from "@shared/enums";
+import { GuessStatus } from "../enums";
 
 export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
     // get user id from cognito token

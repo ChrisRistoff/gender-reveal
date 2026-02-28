@@ -1,4 +1,4 @@
-import { Genders, RevealStatus } from "@shared/enums";
+import { Genders, RevealStatus } from "../enums";
 import { getScanById, createGuess } from "./submitGuessRepository";
 import { SubmitGuessInput, SubmitGuessResult } from "./types";
 
