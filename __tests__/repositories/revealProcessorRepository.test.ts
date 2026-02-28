@@ -1,7 +1,7 @@
-import { DynamoDBDocumentClient, PutCommand, QueryCommand } from "@aws-sdk/lib-dynamodb";
+import { DynamoDBDocumentClient, QueryCommand } from "@aws-sdk/lib-dynamodb";
 import { mockClient } from "aws-sdk-client-mock";
-import { getGuessesById, GuessItem, publishGuessesForScoring } from "../../src/revealProcessor/revealProcessorRepository";
-import { PublishCommand, SNSClient } from "@aws-sdk/client-sns";
+import { GuessItem } from "../../src/revealProcessor/types";
+import { getGuessesById, publishGuessesForScoring } from "../../src/revealProcessor/revealProcessorRepository";
 import { SendMessageBatchCommand, SQSClient } from "@aws-sdk/client-sqs";
 
 const dynamoMock = mockClient(DynamoDBDocumentClient);

@@ -2,12 +2,13 @@ import { processGuesses } from "../../src/revealProcessor/revealProcessorService
 import { DynamoDBRecord, DynamoDBStreamEvent } from "aws-lambda";
 import * as repository from "../../src/revealProcessor/revealProcessorRepository";
 import { Genders, RevealStatus } from "../../src/enums";
+import { GuessItem } from "../../src/revealProcessor/types";
 
 jest.mock("../../src/revealProcessor/revealProcessorRepository");
 const mockRepository = repository as jest.Mocked<typeof repository>;
 
 let RECORD: DynamoDBRecord;
-let GUESS_ITEM: repository.GuessItem;
+let GUESS_ITEM: GuessItem;
 
 describe("scoreGuess service", () => {
     beforeEach(() => {
@@ -107,7 +108,7 @@ describe("scoreGuess service", () => {
     });
 
     it('process guesses succesfully for a valid event and batches chunks correctly', async () => {
-        const guesses: repository.GuessItem[] = [];
+        const guesses: GuessItem[] = [];
 
         for (let i = 0; i < 12; i++) {
             guesses.push(GUESS_ITEM);

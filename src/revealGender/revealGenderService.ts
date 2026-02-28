@@ -1,4 +1,4 @@
-import { Genders, RevealStatus } from "@shared/enums";
+import { Genders, RevealStatus } from "../enums";
 import { getScanByUserAndScanIds } from "./revealGenderRepository";
 import { UpdateScanGenderResult } from "./types";
 

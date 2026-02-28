@@ -1,5 +1,5 @@
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
-import { RevealStatus } from "@shared/enums";
+import { RevealStatus } from "../enums";
 import { updateScanGender } from "./revealGenderService";
 
 export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {

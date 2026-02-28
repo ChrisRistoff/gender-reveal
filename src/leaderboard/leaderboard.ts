@@ -1,7 +1,7 @@
 import { Client } from "pg";
 import { SQSEvent } from "aws-lambda";
 import { SSMClient, GetParameterCommand } from "@aws-sdk/client-ssm";
-import { GuessStatus } from "@shared/enums";
+import { GuessStatus } from "../enums";
 
 const ssm = new SSMClient();
 
